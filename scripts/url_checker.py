@@ -29,7 +29,7 @@ def extract_urls_from_files(input_dir, file_extension):
     )
 
     for filename in (pbar := tqdm(os.listdir(input_dir))):
-        pbar.set_description(f"Processing {file_extension} files: {filename}")
+        pbar.set_description(f"Extracting URLs from: {filename}")
         if filename.lower().endswith(f".{file_extension}"):
             file_path = os.path.join(input_dir, filename)
             try:
@@ -48,6 +48,7 @@ def extract_urls_from_files(input_dir, file_extension):
             writer = csv.DictWriter(csv_file, fieldnames=["url", "filename"])
             writer.writeheader()
             writer.writerows(urls_with_files)
+            print(f"All URL found written to urls_found_{file_extension}.csv successfully.")
     except Exception as e:
         print(f"Failed to write CSV file: {e}")
 
@@ -64,8 +65,10 @@ def filter_urls_by_forges(urls_with_files, forges):
     """
     forge_counts = {forge: 0 for forge in forges}  # Initialize a count dictionary for forges
     filtered = []
+    processed_url = {}
 
-    for url_file in urls_with_files:
+    for url_file in  (pbar := tqdm(urls_with_files)):
+        pbar.set_description(f"Filtering URL/Forge and SWHID checker: {url_file['filename']}")
         url = url_file['url']
         if (
             any(forge in url for forge in forges) and  # Check forge match
@@ -74,8 +77,12 @@ def filter_urls_by_forges(urls_with_files, forges):
             "XMLSchema-instance" not in url and       # Exclude specific URL pattern
             "xlink" not in url                        # Exclude specific URL pattern
         ):
-            url_value = url_swhid_finder(url)
-            url_file['response'] = url_value
+            if url in processed_url:
+                url_file['response'] = 'url_seen'
+            else:
+                url_value = url_swhid_finder(url)
+                processed_url[url] = url_value
+                url_file['response'] = url_value
 
             # Increment the count for the forge the URL belongs to
             filtered.append(url_file)
@@ -127,8 +134,7 @@ def checker_by_type(file_type):
         # Write the data rows
         for forge, count in forge_count.items():
             writer.writerow([forge, count])
-
-    print("Data written to forge_data.csv successfully. \n")
+            print(f"Forge count written to forge_count_{file_type}.csv successfully.")
 
     # Save results to CSV
     save_urls_to_csv(filtered_urls_with_files, output_file)
@@ -160,7 +166,7 @@ def extract_swhids_from_files(input_dir, type):
 
     # Iterate through all files in the directory
     for filename in (pbar := tqdm(os.listdir(input_dir))):
-        pbar.set_description(f"SWHID finder in {type} files: {filename}")
+        pbar.set_description(f"Processing in {type} files: {filename}")
         file_path = os.path.join(input_dir, filename)
         if filename.lower().endswith(f".{type}"):
             # Process text files
